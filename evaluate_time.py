@@ -61,38 +61,12 @@ pool_setting_train = None if not hasattr(setting, 'pool_setting_train') else set
 
 # Prepare inputs
 print('{}-Preparing datasets...'.format(datetime.now()))
-data_train, label_train, data_val, label_val = setting.load_fn(PATH_TRAIN, PATH_VALID)
-
-# Balance
-if setting.balance_fn is not None:
-    print('{}-Balancing datasets...'.format(datetime.now()))
-    num_train_before_balance = data_train.shape[0]
-    repeat_num = setting.balance_fn(label_train)
-    data_train = np.repeat(data_train, repeat_num, axis=0)
-    label_train = np.repeat(label_train, repeat_num, axis=0)
-    data_train, label_train = data_utils.grouped_shuffle([data_train, label_train])
-    num_epochs = math.floor(num_epochs * (num_train_before_balance / data_train.shape[0]))
-
-# Save ply
-if setting.save_ply_fn is not None:
-    print('{}-Saving ply...'.format(datetime.now()))
-    folder = os.path.join(root_folder, 'pts')
-    print('{}-Saving samples as .ply files to {}...'.format(datetime.now(), folder))
-    sample_num_for_ply = min(512, data_train.shape[0])
-    if setting.map_fn is None:
-        data_sample = data_train[:sample_num_for_ply]
-    else:
-        data_sample_list = []
-        for idx in range(sample_num_for_ply):
-            data_sample_list.append(setting.map_fn(data_train[idx], 0)[0])
-        data_sample = np.stack(data_sample_list)
-    setting.save_ply_fn(data_sample, folder)
+_, _, data_val, label_val = setting.load_fn(PATH_TRAIN, PATH_VALID)
 
 # Info
-num_train = data_train.shape[0]
-point_num = data_train.shape[1]
 num_val = data_val.shape[0]
-print('{}-{:d}/{:d} training/validation samples.'.format(datetime.now(), num_train, num_val))
+point_num = data_val.shape[1]
+print('{}-{:d} validation samples.'.format(datetime.now(), num_val))
 
 ###############################################################################
 # PLACEHOLDERS
@@ -106,33 +80,9 @@ jitter_range = tf.placeholder(tf.float32, shape=(1), name="jitter_range")
 global_step = tf.Variable(0, trainable=False, name='global_step')
 is_training = tf.placeholder(tf.bool, name='is_training')
 
-data_train_placeholder = tf.placeholder(data_train.dtype, data_train.shape, name='data_train')
-label_train_placeholder = tf.placeholder(tf.int64, label_train.shape, name='label_train')
 data_val_placeholder = tf.placeholder(data_val.dtype, data_val.shape, name='data_val')
 label_val_placeholder = tf.placeholder(tf.int64, label_val.shape, name='label_val')
 handle = tf.placeholder(tf.string, shape=[], name='handle')
-
-dataset_train = tf.data.Dataset.from_tensor_slices((data_train_placeholder, label_train_placeholder))
-dataset_train = dataset_train.shuffle(buffer_size=batch_size * 4)
-
-if setting.map_fn is not None:
-    print('{}-Map function...'.format(datetime.now()))
-    dataset_train = dataset_train.map(lambda data, label:
-                                      tuple(tf.py_func(setting.map_fn, [data, label], [tf.float32, label.dtype])),
-                                      num_parallel_calls=setting.num_parallel_calls)
-
-if setting.keep_remainder:
-    print('{}-Keep remainder...'.format(datetime.now()))
-    dataset_train = dataset_train.batch(batch_size)
-    batch_num_per_epoch = math.ceil(num_train / batch_size)
-else:
-    print('{}-Dont keep remainder...'.format(datetime.now()))
-    dataset_train = dataset_train.apply(tf.contrib.data.batch_and_drop_remainder(batch_size))
-    batch_num_per_epoch = math.floor(num_train / batch_size)
-dataset_train = dataset_train.repeat(num_epochs)
-iterator_train = dataset_train.make_initializable_iterator()
-batch_num = batch_num_per_epoch * num_epochs
-print('{}-{:d} training batches.'.format(datetime.now(), int(batch_num)))
 
 dataset_val = tf.data.Dataset.from_tensor_slices((data_val_placeholder, label_val_placeholder))
 if setting.map_fn is not None:
@@ -147,7 +97,7 @@ else:
 iterator_val = dataset_val.make_initializable_iterator()
 print('{}-{:d} testing batches per test.'.format(datetime.now(), int(batch_num_val)))
 
-iterator = tf.data.Iterator.from_string_handle(handle, dataset_train.output_types)
+iterator = tf.data.Iterator.from_string_handle(handle, dataset_val.output_types)
 (pts_fts, labels) = iterator.get_next()
 
 pts_fts_sampled = tf.gather_nd(pts_fts, indices=indices, name='pts_fts_sampled')
@@ -187,44 +137,43 @@ labels_2d = tf.expand_dims(labels, axis=-1, name='labels_2d')
 labels_tile = tf.tile(labels_2d, (1, tf.shape(logits)[1]), name='labels_tile')
 loss_op = tf.losses.sparse_softmax_cross_entropy(labels=labels_tile, logits=logits)
 
-with tf.name_scope('metrics'):
-    loss_mean_op, loss_mean_update_op = tf.metrics.mean(loss_op)
-    print (loss_mean_op, loss_mean_update_op)
-    t_1_acc_op, t_1_acc_update_op = tf.metrics.accuracy(labels_tile, predictions)
-    print (t_1_acc_op, t_1_acc_update_op)
-    t_1_per_class_acc_op, t_1_per_class_acc_update_op = tf.metrics.mean_per_class_accuracy(labels_tile,
-                                                                                           predictions,
-                                                                                           setting.num_class)
-    print (t_1_per_class_acc_op, t_1_per_class_acc_update_op)
+#with tf.name_scope('metrics'):
+#    loss_mean_op, loss_mean_update_op = tf.metrics.mean(loss_op)
+#    print (loss_mean_op, loss_mean_update_op)
+#    t_1_acc_op, t_1_acc_update_op = tf.metrics.accuracy(labels_tile, predictions)
+#    print (t_1_acc_op, t_1_acc_update_op)
+#    t_1_per_class_acc_op, t_1_per_class_acc_update_op = tf.metrics.mean_per_class_accuracy(labels_tile,
+#                                                                                           predictions,
+#                                                                                           setting.num_class)
+#    print (t_1_per_class_acc_op, t_1_per_class_acc_update_op)
 
-reset_metrics_op = tf.variables_initializer([var for var in tf.local_variables()
-                                             if var.name.split('/')[0] == 'metrics'])
+#reset_metrics_op = tf.variables_initializer([var for var in tf.local_variables()
+#                                             if var.name.split('/')[0] == 'metrics'])
 
-_ = tf.summary.scalar('loss/train', tensor=loss_mean_op, collections=['train'])
-_ = tf.summary.scalar('t_1_acc/train', tensor=t_1_acc_op, collections=['train'])
-_ = tf.summary.scalar('t_1_per_class_acc/train', tensor=t_1_per_class_acc_op, collections=['train'])
+#_ = tf.summary.scalar('loss/train', tensor=loss_mean_op, collections=['train'])
+#_ = tf.summary.scalar('t_1_acc/train', tensor=t_1_acc_op, collections=['train'])
+#_ = tf.summary.scalar('t_1_per_class_acc/train', tensor=t_1_per_class_acc_op, collections=['train'])
 
-_ = tf.summary.scalar('loss/val', tensor=loss_mean_op, collections=['val'])
-_ = tf.summary.scalar('t_1_acc/val', tensor=t_1_acc_op, collections=['val'])
-_ = tf.summary.scalar('t_1_per_class_acc/val', tensor=t_1_per_class_acc_op, collections=['val'])
+#_ = tf.summary.scalar('loss/val', tensor=loss_mean_op, collections=['val'])
+#_ = tf.summary.scalar('t_1_acc/val', tensor=t_1_acc_op, collections=['val'])
+#_ = tf.summary.scalar('t_1_per_class_acc/val', tensor=t_1_per_class_acc_op, collections=['val'])
 
-lr_exp_op = tf.train.exponential_decay(setting.learning_rate_base, global_step, setting.decay_steps,
-                                       setting.decay_rate, staircase=True)
-lr_clip_op = tf.maximum(lr_exp_op, setting.learning_rate_min)
-_ = tf.summary.scalar('learning_rate', tensor=lr_clip_op, collections=['train'])
-reg_loss = setting.weight_decay * tf.losses.get_regularization_loss()
-if setting.optimizer == 'adam':
-    optimizer = tf.train.AdamOptimizer(learning_rate=lr_clip_op, epsilon=setting.epsilon)
-elif setting.optimizer == 'momentum':
-    optimizer = tf.train.MomentumOptimizer(learning_rate=lr_clip_op, momentum=setting.momentum, use_nesterov=True)
-update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-with tf.control_dependencies(update_ops):
-    train_op = optimizer.minimize(loss_op + reg_loss, global_step=global_step)
+#lr_exp_op = tf.train.exponential_decay(setting.learning_rate_base, global_step, setting.decay_steps,
+#                                       setting.decay_rate, staircase=True)
+#lr_clip_op = tf.maximum(lr_exp_op, setting.learning_rate_min)
+#_ = tf.summary.scalar('learning_rate', tensor=lr_clip_op, collections=['train'])
+#reg_loss = setting.weight_decay * tf.losses.get_regularization_loss()
+#if setting.optimizer == 'adam':
+#    optimizer = tf.train.AdamOptimizer(learning_rate=lr_clip_op, epsilon=setting.epsilon)
+#elif setting.optimizer == 'momentum':
+#    optimizer = tf.train.MomentumOptimizer(learning_rate=lr_clip_op, momentum=setting.momentum, use_nesterov=True)
+#update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+#with tf.control_dependencies(update_ops):
+#    train_op = optimizer.minimize(loss_op + reg_loss, global_step=global_step)
 
-init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
+#init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 
-saver = tf.train.Saver(max_to_keep=None)
-
+#saver = tf.train.Saver(max_to_keep=None)
 parameter_num = np.sum([np.prod(v.shape.as_list()) for v in tf.trainable_variables()])
 print('{}-Parameter number: {:d}.'.format(datetime.now(), parameter_num))
 
@@ -239,19 +188,21 @@ def evaluate(model_num, num_votes, verbose=False):
 
     # Start session
     with tf.Session() as sess:
-        sess.run(init_op)
+        #sess.run(init_op)
 
         # Load the model
         saver = tf.train.import_meta_graph(model_path + '.meta')
         saver.restore(sess, model_path)
         if verbose:
             print('{}-Checkpoint loaded from {}!'.format(datetime.now(), model_path))
+        print ("LOADED!")
+        exit()
 
         # Handle
         handle_val = sess.run(iterator_val.string_handle())
 
         # Reset metrics
-        sess.run(reset_metrics_op)
+        #sess.run(reset_metrics_op)
 
         # Data to remember
         voted_logits = []
