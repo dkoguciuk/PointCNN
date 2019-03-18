@@ -65,6 +65,28 @@ Here we list the commands for training/evaluating PointCNN on classification and
   cd ../pointcnn_cls
   ./train_val_modelnet.sh -g 0 -x modelnet_x3_l4
   ```
+  
+  Or to train multiple instances of PointCNN on ModelNet40 dataset:
+
+  ```
+  cd ../pointcnn_cls
+  ./train_val_modelnet_ens.sh -g 0 -x modelnet_x3_l4
+  ```
+  
+  * #### ShapeNetCore55
+  Please refer to <a href="https://github.com/dkoguciuk/ensemble_learning_for_point_clouds" target="_blank">ensemble_learning_for_point_clouds</a> for preparing ShapeNetCore55 dataset.
+  
+  ```
+  cd ../pointcnn_cls
+  ./train_val_shapenet.sh -g 0 -x shapenet_x3_l4
+  ```
+  
+  Or to train multiple instances of PointCNN on ShapeNetCore55 dataset:
+
+  ```
+  cd ../pointcnn_cls
+  ./train_val_shapenet_ens.sh -g 0 -x shapenet_x3_l4
+  ```
 
   * #### ScanNet
   Please refer to <http://www.scan-net.org/>  for downloading ScanNet task data and scannet_labelmap, and refer to https://github.com/ScanNet/ScanNet/tree/master/Tasks/Benchmark for downloading ScanNet benchmark files:
