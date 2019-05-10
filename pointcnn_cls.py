@@ -10,6 +10,7 @@ from pointcnn import PointCNN
 class Net(PointCNN):
     def __init__(self, points, features, is_training, setting):
         PointCNN.__init__(self, points, features, is_training, setting)
+        self.point_features = self.layer_fts[1]
         fc_mean = tf.reduce_mean(self.fc_layers[-1], axis=1, keepdims=True, name='fc_mean')
         self.fc_layers[-1] = tf.cond(is_training, lambda: self.fc_layers[-1], lambda: fc_mean)
         self.logits = pf.dense(self.fc_layers[-1], setting.num_class, 'logits',
