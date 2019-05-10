@@ -160,6 +160,9 @@ def evaluate(model_num, num_votes, verbose=False):
                         label_val_placeholder: label_val,
                     })
 
+            print (data_val[0][0])
+            exit()
+
             # Data to remember
             batch_logits = []
             batch_labels = []
@@ -193,7 +196,7 @@ def evaluate(model_num, num_votes, verbose=False):
 
             # Concatenate
             batch_logits = np.concatenate(batch_logits, axis=0)
-            batch_labels = np.array(batch_labels)
+            batch_labels = np.concatenate(batch_labels)
             voted_logits.append(batch_logits)
             voted_labels = batch_labels
 
