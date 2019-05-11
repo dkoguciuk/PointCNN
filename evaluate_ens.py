@@ -160,9 +160,6 @@ def evaluate(model_num, num_votes, verbose=False):
                         label_val_placeholder: label_val,
                     })
 
-            print (data_val[0][0])
-            exit()
-
             # Data to remember
             batch_logits = []
             batch_labels = []
