@@ -22,6 +22,7 @@ from datetime import datetime
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', '-t', help='Path to data', required=True)
+    parser.add_argument('--discard_normal', action='store_true', help='discard normal information')
     parser.add_argument('--path_val', '-v', help='Path to validation data')
     parser.add_argument('--load_ckpt', '-l', help='Path to a check point file for load')
     parser.add_argument('--save_folder', '-s', help='Path to folder for saving check points and summary', required=True)
@@ -39,11 +40,10 @@ def main():
     sys.stdout = open(os.path.join(root_folder, 'log.txt'), 'w')
 
     print('PID:', os.getpid())
-
     print(args)
 
     model = importlib.import_module(args.model)
-    setting_path = os.path.join(os.path.dirname(__file__), args.model)
+    setting_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), args.model)
     sys.path.append(setting_path)
     setting = importlib.import_module(args.setting)
 
@@ -84,10 +84,14 @@ def main():
             data_sample = np.stack(data_sample_list)
         setting.save_ply_fn(data_sample, folder)
 
+    if args.discard_normal:
+        data_train = data_train[..., :3]
+        data_val = data_val[..., :3]
+
     num_train = data_train.shape[0]
     point_num = data_train.shape[1]
     num_val = data_val.shape[0]
-    print('{}-{:d}/{:d} training/validation samples.'.format(datetime.now(), num_train, num_val))
+    print('{}-{}/{} training/validation shapes.'.format(datetime.now(), data_train.shape, data_val.shape))
 
     ######################################################################
     # Placeholders
