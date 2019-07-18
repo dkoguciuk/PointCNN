@@ -15,10 +15,11 @@ from datetime import datetime
 
 # Append python path
 MODELS_PATH = 'logs_modelnet'
-PATH_TRAIN = '../data/modelnet40_ply_hdf5_2048/train_files.txt'
-PATH_VALID = '../data/modelnet40_ply_hdf5_2048/test_files.txt'
+PATH_TRAIN = '../data/modelnet/train_files.txt'
+PATH_VALID = '../data/modelnet/test_files.txt'
 MODEL_NAME = 'pointcnn_cls'
 SETTINGS_FILE = 'modelnet_x3_l4'
+DISCARD_NORMAL = True
 
 NUM_CLASSES = 40
 BATCH_SIZE = 4
@@ -51,11 +52,14 @@ jitter_val = setting.jitter_val
 print('{}-Preparing datasets...'.format(datetime.now()))
 _, _, data_val, label_val = setting.load_fn(PATH_TRAIN, PATH_VALID)
 
+# Discard normal
+if DISCARD_NORMAL:
+    data_val = data_val[..., :3]
+
 # Info
-num_train = data_val.shape[0]
 point_num = data_val.shape[1]
 num_val = data_val.shape[0]
-print('{}-{:d}/{:d} training/validation samples.'.format(datetime.now(), num_train, num_val))
+print('{}-{} validation shapes.'.format(datetime.now(), data_val.shape))
 
 ###############################################################################
 # PLACEHOLDERS
@@ -130,10 +134,7 @@ labels_tile = tf.tile(labels_2d, (1, tf.shape(logits)[1]), name='labels_tile')
 ###############################################################################
 
 
-def evaluate(model_num, num_votes, verbose=False):
-
-    # Model path
-    model_path = MODELS_PATH + '/model_' + str(model_num) + '/model_' + str(model_num)
+def evaluate(model_path, num_votes, verbose=False):
 
     # Start session
     with tf.Session() as sess:
@@ -207,8 +208,8 @@ def evaluate(model_num, num_votes, verbose=False):
 # TIME EVAL
 ###############################################################################
 
-
-logits, labels, accuracy = evaluate(1, 1, True)
+model_path = '../models/cls/pointcnn_cls_modelnet_x3_l4_2019-07-08-15-29-50_14671/ckpts/iter-78847'
+logits, labels, accuracy = evaluate(model_path, 1, True)
 print('LOGITS:', logits.shape)
 print('LABELS:', labels.shape)
 print('ACCURACY:', accuracy)

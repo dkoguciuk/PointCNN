@@ -64,7 +64,7 @@ sampling = 'random'
 optimizer = 'adam'
 epsilon = 1e-2
 
-data_dim = 6
+data_dim = 3
 use_extra_features = False
 with_X_transformation = True
 sorting_method = None

@@ -47,5 +47,5 @@ fi
 for i in 0 1 2 3 4 
 do
   echo "Train/Val with setting $setting on GPU $gpu!"
-  CUDA_VISIBLE_DEVICES=$gpu python3 ../train_val_cls.py -t $train_files -v $val_files -s $models_folder -m pointcnn_cls -x $setting
+  CUDA_VISIBLE_DEVICES=$gpu python3 ../train_val_cls.py -t $train_files -v $val_files -s $models_folder -m pointcnn_cls -x $setting --discard_normal
 done
